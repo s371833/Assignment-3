@@ -74,10 +74,9 @@ if __name__ == "__main__":
 
 # In[2]:
 
-
-## pip install pygame
 import pygame
 import sys
+import random
 
 # Initialize Pygame
 pygame.init()
@@ -85,10 +84,14 @@ pygame.init()
 # Constants
 WIDTH, HEIGHT = 800, 600
 FPS = 60
+GROUND_HEIGHT = 50
+GRAVITY = 1
 
 # Colors
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
+BLUE = (0, 0, 255)
+GREEN = (0, 255, 0)
 
 # Player class
 class Player(pygame.sprite.Sprite):
@@ -97,28 +100,31 @@ class Player(pygame.sprite.Sprite):
         self.image = pygame.Surface((50, 50))
         self.image.fill(RED)
         self.rect = self.image.get_rect()
-        self.rect.center = (100, HEIGHT - 50)
+        self.rect.center = (100, HEIGHT - GROUND_HEIGHT - 25)
         self.speed = 5
         self.jump_height = -15
-        self.gravity = 1
         self.vel_y = 0
         self.health = 100
         self.lives = 3
 
     def update(self):
+        self.handle_input()
+        self.apply_gravity()
+
+    def handle_input(self):
         keys = pygame.key.get_pressed()
         if keys[pygame.K_LEFT] and self.rect.left > 0:
             self.rect.x -= self.speed
         if keys[pygame.K_RIGHT] and self.rect.right < WIDTH:
             self.rect.x += self.speed
-        if keys[pygame.K_SPACE] and self.rect.bottom >= HEIGHT:
+        if keys[pygame.K_SPACE] and self.rect.bottom >= HEIGHT - GROUND_HEIGHT:
             self.vel_y = self.jump_height
 
-        # Apply gravity
-        self.vel_y += self.gravity
+    def apply_gravity(self):
+        self.vel_y += GRAVITY
         self.rect.y += self.vel_y
-        if self.rect.bottom > HEIGHT:
-            self.rect.bottom = HEIGHT
+        if self.rect.bottom > HEIGHT - GROUND_HEIGHT:
+            self.rect.bottom = HEIGHT - GROUND_HEIGHT
 
 # Projectile class
 class Projectile(pygame.sprite.Sprite):
@@ -140,40 +146,64 @@ class Enemy(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
         self.image = pygame.Surface((50, 50))
-        self.image.fill(WHITE)
+        self.image.fill(BLUE)
         self.rect = self.image.get_rect()
-        self.rect.center = (WIDTH - 100, HEIGHT - 50)
+        self.rect.center = (WIDTH - 100, HEIGHT - GROUND_HEIGHT - 25)
         self.speed = 3
 
     def update(self):
+        self.move_left_wrap()
+
+    def move_left_wrap(self):
         self.rect.x -= self.speed
         if self.rect.right < 0:
             self.rect.left = WIDTH
-            self.rect.y = HEIGHT - 50
+            self.rect.y = HEIGHT - GROUND_HEIGHT - 25
 
-# Game initialization
+# Collectible class
+class Collectible(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        self.image = pygame.Surface((30, 30))
+        self.image.fill(GREEN)
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y)
+
+# Initialize game
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Side-Scrolling Game")
 clock = pygame.time.Clock()
 
 all_sprites = pygame.sprite.Group()
-player = Player()
 enemies = pygame.sprite.Group()
 projectiles = pygame.sprite.Group()
+collectibles = pygame.sprite.Group()
 
+player = Player()
 all_sprites.add(player)
 
-# Main game loop
+# Game loop
 running = True
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-            # Shoot projectile when space key is pressed
             projectile = Projectile(player.rect.right, player.rect.centery)
             all_sprites.add(projectile)
             projectiles.add(projectile)
+
+    # Add enemies randomly
+    if random.randint(1, 100) < 2:
+        enemy = Enemy()
+        all_sprites.add(enemy)
+        enemies.add(enemy)
+
+    # Add collectibles randomly
+    if random.randint(1, 100) < 1:
+        collectible = Collectible(random.randint(50, WIDTH - 50), random.randint(50, HEIGHT - GROUND_HEIGHT - 50))
+        all_sprites.add(collectible)
+        collectibles.add(collectible)
 
     # Update
     all_sprites.update()
@@ -181,16 +211,19 @@ while running:
     projectiles.update()
 
     # Collision detection
-    hits = pygame.sprite.groupcollide(enemies, projectiles, True, True)
-    for hit in hits:
+    hits_projectile_enemy = pygame.sprite.groupcollide(enemies, projectiles, True, True)
+    for hit in hits_projectile_enemy:
         # Increase score or handle other actions
+        pass
+
+    hits_player_collectible = pygame.sprite.spritecollide(player, collectibles, True)
+    for hit in hits_player_collectible:
+        # Increase score or handle other actions (e.g., health boost)
         pass
 
     # Draw
     screen.fill((0, 0, 0))
     all_sprites.draw(screen)
-    enemies.draw(screen)
-    projectiles.draw(screen)
 
     # Display
     pygame.display.flip()
@@ -198,7 +231,6 @@ while running:
     # Cap the frame rate
     clock.tick(FPS)
 
-# Quit the game
 pygame.quit()
 sys.exit()
 
